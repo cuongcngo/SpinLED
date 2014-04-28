@@ -1,15 +1,18 @@
+/*  timing.ino
+*   
+*   Used to sync rotation speed and LED frequency
+*
+*/
+
 int pin;
 boolean goingUp;
 
 double frameRate = 15.0;
 int numberOfColumns = 128;
+int numberOfRows = 8;
 unsigned long prevTime;
 double frequency = frameRate * numberOfColumns;
-unsigned long periodUs;
-
-unsigned int delayUs = 160;
-
-int counter;
+unsigned long periodUs = (1.0/frequency) * 1000000.0;
 
 void setup()
 {
@@ -20,10 +23,7 @@ void setup()
   {
     pinMode(i, OUTPUT);
   }
-  
-  counter = 0;
-  
-  periodUs = (1.0/frequency) * 1000000.0;
+
   prevTime = micros();
 }
 
@@ -54,17 +54,11 @@ void loop()
   {
     prevTime = prevTime + periodUs;
     
-    digitalWrite(pin, HIGH);
+    digitalWrite(pin, 1);
     delayMicroseconds(0.5 * periodUs);
-    digitalWrite(pin, LOW);
+    digitalWrite(pin, 0);
     
     switchPin();
-//    counter++;
-//    if(counter > 12*numberOfColumns)
-//    {
-//      pin = 2 + ((pin + 1 - 2) % 8);
-//      counter = 0;
-//    }
   }
   
   
