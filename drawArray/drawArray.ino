@@ -5,101 +5,36 @@
 */
 #include <cmath>
 #define PI 3.14159265
-#define INPUT_ARRAY_SIZE 1024
+#define NUMBER_OF_COLUMNS 140
+#define NUMBER_OF_ROWS 8
+#define INITIAL_FRAME_RATE 20.0
 
-double frameRate = 20.0;
-int numberOfColumns = 128;
-int numberOfRows = 8;
 unsigned long prevTime;
-double columnFrequency = frameRate * numberOfColumns;
-unsigned long columnPeriodUs = (1.0/columnFrequency) * 1000000.0;
+unsigned long time;
+double columnFrequency = INITIAL_FRAME_RATE * NUMBER_OF_COLUMNS;
+volatile unsigned long columnPeriodUs = (1.0/columnFrequency) * 1000000.0;
 
 int pinValues[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-int currentColumn = 0;
+volatile int currentColumn = 0;
+volatile boolean justHadInterrupt = false;
+volatile unsigned long prevInterruptTime;
 
-boolean inputArray[INPUT_ARRAY_SIZE] = {1, 1, 1, 1, 1, 1, 1, 1,
-                                        0, 1, 0, 0, 0, 0, 0, 0, 
-                                        0, 0, 1, 0, 0, 0, 0, 0, 
-                                        0, 0, 0, 1, 1, 0, 0, 0, 
-                                        0, 0, 0, 0, 0, 1, 0, 0, 
-                                        0, 0, 0, 0, 0, 0, 1, 0, 
-                                        1, 1, 1, 1, 1, 1, 1, 1,
-                                        0, 0, 0, 0, 0, 0, 0, 0, 
-
-                                        0, 0, 0, 0, 0, 0, 0, 0, 
-                                        0, 0, 1, 0, 0, 1, 0, 0, 
-                                        0, 1, 0, 1, 1, 0, 1, 0, 
-                                        0, 1, 0, 1, 1, 0, 1, 0, 
-                                        1, 1, 1, 1, 1, 1, 1, 1,
-                                        0, 1, 0, 0, 0, 0, 1, 0, 
-                                        0, 0, 0, 0, 0, 0, 0, 0, 
-                                        0, 0, 0, 0, 0, 0, 0, 0, 
-
-                                        0, 1, 1, 0, 0, 0, 1, 0, 
-                                        1, 0, 1, 0, 0, 0, 0, 1, 
-                                        1, 0, 0, 1, 0, 0, 0, 1, 
-                                        1, 0, 0, 1, 1, 0, 0, 1, 
-                                        1, 0, 0, 0, 1, 0, 0, 1, 
-                                        1, 0, 0, 0, 0, 1, 0, 1, 
-                                        0, 1, 0, 0, 0, 1, 1, 0
-                                        };
-
-
-void initializeSinWave()
-{
-  inputArray[1023] = true;
-  int cycles = 8;
-  int period = numberOfColumns / cycles;
-  
-  for(int i = 0; i < numberOfColumns; i++)
-  {
-    int highPin = 4 + (int)(3.5 * sin(((double)(i % period)) / period * 2*PI));
-    for(int j = 0; j < numberOfRows; j++)
-    {
-      if(j == highPin)
-        inputArray[i * numberOfRows + j] = true;
-      else
-        inputArray[i * numberOfRows + j] = false;
-    }
-  }
-
-/*
-  for(int i = 0; i < 1024; i++)
-  {
-    if((i % numberOfRows) == 7)
-      Serial.println(inputArray[i]);
-    else
-    {
-      Serial.print(inputArray[i]);
-      Serial.print(' ');
-    }
-  }
-
-  */
-}
-
-void updatePinValues()
-{
-  for(int i = 0; i < 8; i++)
-  {
-    pinValues[i] = inputArray[currentColumn * 8 + i];
-  }
-
-  currentColumn = (currentColumn + 1) % numberOfColumns;
-}
+boolean inputArray[NUMBER_OF_COLUMNS * NUMBER_OF_ROWS] = {0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0,0,1,1,1,0,0,0,0,1,1,1,0,0,0,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,1,0,0,0,0,1,1,0,1,1,1,1,1,1,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,0,0,0,1,1,1,1,1,0,1,1,1,1,0,0,0,1,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 void setup()
 {
   Serial.begin(115200);
   Serial.println("Hello!");
 
-  for(int i = 2; i < 10; i++)
+  attachInterrupt(0, fullRotationInterrupt, FALLING);
+  for(int i = 3; i < 11; i++)
   {
     pinMode(i, OUTPUT);
   }
 
   prevTime = micros();
-
+  prevInterruptTime = micros();
+  time = micros();
   //initializeSinWave();
 
   Serial.println("Setup done!");
@@ -107,23 +42,65 @@ void setup()
 
 void loop()
 {
-  unsigned long time = micros();
+  
+
+  if(justHadInterrupt)
+  {
+      currentColumn = 0;
+      justHadInterrupt = false;
+      time = micros();
+      goto startLoop;
+  }
+
+  time = micros();
   if(time - prevTime >= columnPeriodUs)
   {
-    prevTime = prevTime + columnPeriodUs;
+    startLoop:
+    prevTime = time;
     
     for(int i = 0; i < 8; i++)
     {
-      digitalWrite(i + 2, pinValues[i]);
+      digitalWrite(10 - ((8 - i) % 8), inputArray[currentColumn * 8 + i]);
     }
 
-    updatePinValues();
+    currentColumn = (currentColumn + 1) % NUMBER_OF_COLUMNS;
 
-    delayMicroseconds(0.3 * columnPeriodUs);
+
+    /*
+    delayMicroseconds(0.5 * columnPeriodUs);
 
     for(int i = 0; i < 8; i++)
     {
-      digitalWrite(i + 2, LOW);
+      digitalWrite(10 - ((8 - i) % 8), LOW);
+    }
+    */
+  }
+}
+
+void initializeSinWave()
+{
+  inputArray[1023] = true;
+  int cycles = 8;
+  int period = NUMBER_OF_COLUMNS / cycles;
+  
+  for(int i = 0; i < NUMBER_OF_COLUMNS; i++)
+  {
+    int highPin = 4 + (int)(3.5 * sin(((double)(i % period)) / period * 2*PI));
+    for(int j = 0; j < NUMBER_OF_ROWS; j++)
+    {
+      if(j == highPin)
+        inputArray[i * NUMBER_OF_ROWS + j] = true;
+      else
+        inputArray[i * NUMBER_OF_ROWS + j] = false;
     }
   }
+}
+
+void fullRotationInterrupt()
+{
+  unsigned long time = micros();
+  columnPeriodUs = (unsigned long)((double)(time - prevInterruptTime))/NUMBER_OF_COLUMNS;
+
+  justHadInterrupt = true;
+  prevInterruptTime = time;
 }
