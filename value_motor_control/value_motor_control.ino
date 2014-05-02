@@ -1,6 +1,6 @@
 #include <Servo.h>
 
-const int signal = 3;
+const int signal = 9;
 const int trig = 4;
 const int echo = 5;
 Servo servo1;
